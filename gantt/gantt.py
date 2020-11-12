@@ -12,7 +12,7 @@ Author : Alexandre Norman - norman at xael.org
 Contributors:
 
 * Sébastien NOBILI - pipoprods at free.fr
-
+* Jesper Hogstrom - jspr.hgstrm at gmail dot com
 
 Licence : GPL v3 or any later version
 
@@ -47,6 +47,7 @@ import re
 # http://svgwrite.readthedocs.org/en/latest/
 
 import svgwrite
+import svgwrite.mixins
 # conversion from mm/cm to pixel is done by ourselve as firefox seems
 # to have a bug for big numbers...
 # 3.543307 is for conversion from mm to pt units !
@@ -70,7 +71,7 @@ class _my_svgwrite_drawing_wrapper(svgwrite.Drawing):
         # Fix height and width
         self['height'] = height
         self['width'] = width
-        
+
         if sys.version_info[0] == 2:
             test = type(self.filename) == types.FileType or type(self.filename) == types.InstanceType
         elif sys.version_info[0] == 3:
@@ -80,7 +81,7 @@ class _my_svgwrite_drawing_wrapper(svgwrite.Drawing):
             self.write(self.filename)
         else:
             fileobj = io.open(str(self.filename), mode='w', encoding='utf-8')
-            self.write(fileobj)
+            self.write(fileobj, pretty=True)
             fileobj.close()
 
 
@@ -136,7 +137,7 @@ FONT_ATTR = {
 def define_font_attributes(fill='black', stroke='black', stroke_width=0, font_family="Verdana"):
     """
     Define font attributes
-    
+
     Keyword arguments:
     fill -- fill - default 'black'
     stroke -- stroke - default 'black'
@@ -149,7 +150,7 @@ def define_font_attributes(fill='black', stroke='black', stroke_width=0, font_fa
         'fill': fill,
         'stroke' : stroke,
         'stroke_width': stroke_width,
-        'font_family': font_family, 
+        'font_family': font_family,
         }
 
     return
@@ -258,6 +259,11 @@ def _flatten(l, ltypes=(list, tuple)):
                 l[i:i + 1] = l[i]
         i += 1
     return ltype(l)
+
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
 
 ############################################################################
 class GroupOfResources(object):
@@ -609,7 +615,9 @@ class Task(object):
     """
     Class for manipulating Tasks
     """
-    def __init__(self, name, start=None, stop=None, duration=None, depends_of=None, resources=None, percent_done=0, color=None, fullname=None, display=True, state=''):
+    def __init__(self, name, start=None, stop=None, duration=None, depends_of=None, resources=None, percent_done=0, color=None, fullname=None, display=True, state='',
+        *,
+        url: str = None):
         """
         Initialize task object. Two of start, stop or duration may be given.
         This task can rely on other task and will be completed with resources.
@@ -642,6 +650,7 @@ class Task(object):
         self.color = color
         self.display = display
         self.state = state
+        self.url = url
 
         ends = (self.start, self.stop, self.duration)
         nonecount = 0
@@ -1047,20 +1056,22 @@ class Task(object):
         svg = svgwrite.container.Group(id=re.sub(r"[ ,'\/()]", '_', self.name))
         svg.add(svgwrite.shapes.Rect(
                 insert=((x+1+offset)*mm, (y+1)*mm),
-                size=((d-2)*mm, 8*mm),
+                size=((d-2)*mm, 4.1*mm),
                 fill=color,
                 stroke=color,
                 stroke_width=2,
                 opacity=0.85,
                 ))
-        svg.add(svgwrite.shapes.Rect(
-                insert=((x+1+offset)*mm, (y+6)*mm),
-                size=(((d-2))*mm, 3*mm),
-                fill="#909090",
-                stroke=color,
-                stroke_width=1,
-                opacity=0.2,
-                ))
+        # svg.add(svgwrite.shapes.Rect(
+        #         insert=((x+1+offset)*mm, (y+6)*mm),
+        #         size=(((d-2))*mm, 3*mm),
+        #         fill="#909090",
+        #         stroke=color,
+        #         stroke_width=1,
+        #         opacity=0.2,
+        #         ))
+
+        add_modified_begin_mark = add_modified_end_mark = add_end_mark = add_begin_mark = False
 
         if add_modified_begin_mark:
             svg.add(svgwrite.shapes.Rect(
@@ -1081,7 +1092,7 @@ class Task(object):
                     stroke_width=1,
                     opacity=0.35,
                     ))
-        
+
 
         if add_begin_mark:
             svg.add(svgwrite.shapes.Rect(
@@ -1117,8 +1128,13 @@ class Task(object):
             tx = x+2
         else:
             tx = 5
-            
-        svg.add(svgwrite.text.Text(self.fullname, insert=((tx)*mm, (y + 5)*mm), fill=_font_attributes()['fill'], stroke=_font_attributes()['stroke'], stroke_width=_font_attributes()['stroke_width'], font_family=_font_attributes()['font_family'], font_size=15))
+
+        if self.url:
+            group = svg.add(svgwrite.container.Hyperlink(self.url))
+        else:
+            group = svg
+        group.add(svgwrite.text.Text(self.fullname, insert=((tx)*mm, (y + 5)*mm), fill=_font_attributes()['fill'], stroke=_font_attributes()['stroke'], stroke_width=_font_attributes()['stroke_width'], font_family=_font_attributes()['font_family'], font_size=15))
+
 
         if self.resources is not None:
             t = " / ".join(["{0}".format(r.name) for r in self.resources])
@@ -1618,12 +1634,22 @@ class Milestone(Task):
 
 ############################################################################
 
+class Legend:
+    def __init__(self, name: str, *, color: str = None, url: str = None):
+        self.color = color
+        self.name = name
+        self.url = url
+
+class Link:
+    def __init__(self, name: str, *, url: str = None):
+        self.name = name
+        self.url = url
 
 class Project(object):
     """
     Class for handling projects
     """
-    def __init__(self, name="", color=None):
+    def __init__(self, name="", color=None, *, url: str = None):
         """
         Initialize project with a given name and color for all tasks
 
@@ -1632,7 +1658,10 @@ class Project(object):
         color -- color for all tasks of the project
         """
         self.tasks = []
+        self.legends = []
+        self.links = []
         self.name = name
+        self.url = url
         if color is None:
             self.color = '#FFFF90'
         else:
@@ -1651,6 +1680,12 @@ class Project(object):
         self.tasks.append(task)
         self.cache_nb_elements = None
         return
+
+    def add_legend(self, legend: Legend):
+        self.legends.append(legend)
+
+    def add_link(self, link: Link):
+        self.links.append(link)
 
     def _svg_calendar(self, maxx, maxy, start_date, today=None, scale=DRAW_WITH_DAILY_SCALE, offset=0):
         """
@@ -1877,8 +1912,111 @@ class Project(object):
 
         dwg.add(self._svg_calendar(maxx, pheight, start_date, today, scale, offset=offset))
         dwg.add(ldwg)
-        dwg.save(width=(maxx+1+offset/10)*cm, height=(pheight+3)*cm)
+        legend_size, legend = self._svg_legend(x_start=(maxx+1+offset/10)*cm)
+
+        dwg.add(legend)
+        links_width, links = self._svg_links(x_start=(maxx+1+offset/10)*cm, y_start=legend_size.y)
+        dwg.add(links)
+
+
+        dwg.save(width=(maxx+1+offset/10)*cm + legend_size.x*cm, height=(pheight+3)*cm)
         return
+
+    def _svg_legend(self, x_start: int):
+        padding = 10
+        box_width = 6
+        row_height = 7
+        header_height = 15
+        xoffset = padding + x_start
+
+        drawing = svgwrite.container.Group()
+
+        drawing.add(svgwrite.shapes.Rect(
+            insert=(0, 1*mm),
+            size=(box_width*cm, (header_height + len(self.legends) * row_height)*mm),
+            fill="#FF8000",
+            stroke="#000000",
+            stroke_width=1,
+            opacity=0.05,
+            ))
+
+        drawing.add(svgwrite.text.Text("Legend",
+            insert=(1, 10*mm),
+            fill='#400000', stroke='#400000', stroke_width=0,
+            font_family=_font_attributes()['font_family'], font_size=15+5, font_weight="bold"))
+
+        for y, legend in enumerate(self.legends):
+            if legend.url:
+                group = drawing.add(svgwrite.container.Hyperlink(legend.url))
+            else:
+                group = drawing
+            group.add(svgwrite.shapes.Rect(
+                insert=(5, ((y+2)*7)*mm - 3),
+                size=(4*mm, 4.1*mm),
+                fill=legend.color,
+                stroke="#000000",
+                stroke_width=1,
+                opacity=0.95,
+                ))
+            group.add(svgwrite.text.Text(legend.name,
+                insert=(7*mm, (3 + (y+2)*7)*mm),
+                fill='#400000', stroke='#400000', stroke_width=0,
+                font_family=_font_attributes()['font_family'], font_size=10+5, font_weight="bold"))
+
+        drawing.translate(xoffset, 0)
+
+        size = Point(box_width, (header_height + len(self.links) * row_height)*mm)
+        print(f"Legend size: {size.x} x {size.y}")
+
+        return size, drawing
+
+    def _svg_links(self, x_start: int, y_start: int):
+        padding = 10
+        box_width = 6
+        row_height = 7
+        header_height = 15
+        xoffset = padding + x_start
+        BLACK="#000000"
+
+        drawing = svgwrite.container.Group()
+
+        drawing.add(svgwrite.shapes.Rect(
+            insert=(0, 1*mm),
+            size=(box_width*cm, (header_height + len(self.legends) * row_height)*mm),
+            fill="#FF8000",
+            stroke="#000000",
+            stroke_width=1,
+            opacity=0.05,
+            ))
+
+        drawing.add(svgwrite.text.Text("Links",
+            insert=(1, 10*mm),
+            fill='#400000', stroke='#400000', stroke_width=0,
+            font_family=_font_attributes()['font_family'], font_size=15+5, font_weight="bold"))
+
+        for y, link in enumerate(self.links):
+            if link.url:
+                group = drawing.add(svgwrite.container.Hyperlink(link.url))
+            else:
+                continue
+            print(f"Adding {link.name} -> {link.url}")
+            group.add(svgwrite.shapes.Circle(
+                center=(5, ((y+2)*7)*mm - 3),
+                r=1,
+                fill=BLACK,
+                stroke="#000000",
+                stroke_width=1,
+                opacity=0.95,
+                ))
+            group.add(svgwrite.text.Text(link.name,
+                insert=(7*mm, (3 + (y+2)*7)*mm),
+                fill='#400000', stroke='#400000', stroke_width=0,
+                font_family=_font_attributes()['font_family'], font_size=10+5, font_weight="bold"))
+
+        drawing.translate(xoffset, y_start*mm)
+
+        size = Point(box_width, (header_height + len(self.links) * row_height)*mm)
+        return size, drawing
 
     def make_svg_for_resources(self, filename, today=None, start=None, end=None, resources=None, one_line_for_tasks=False, filter='', scale=DRAW_WITH_DAILY_SCALE, title_align_on_left=False, offset=0):
         """
@@ -1952,8 +2090,8 @@ class Project(object):
         if not one_line_for_tasks:
             ldwg.add(
                 svgwrite.shapes.Line(
-                    start=((0)*cm, (2)*cm), 
-                    end=((maxx+1+offset/10)*cm, (2)*cm), 
+                    start=((0)*cm, (2)*cm),
+                    end=((maxx+1+offset/10)*cm, (2)*cm),
                     stroke='black',
                     ))
 
