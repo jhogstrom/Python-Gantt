@@ -55,6 +55,7 @@ import gantt
 
 ############################################################################
 
+
 def __show_version__(name, **kwargs):
     """
     Show version
@@ -68,7 +69,7 @@ def __show_version__(name, **kwargs):
 def _iso_date_to_datetime(isodate):
     """
     """
-    __LOG__.debug("_iso_date_to_datetime ({0})".format({'isodate':isodate}))
+    __LOG__.debug("_iso_date_to_datetime ({0})".format({'isodate': isodate}))
     y, m, d = isodate.split('-')
     if m[0] == '0':
         m = m[1]
@@ -78,11 +79,13 @@ def _iso_date_to_datetime(isodate):
 
 ############################################################################
 
+
 __LOG__ = None
 LISTE_IGNORE_TAGS = []
 LISTE_FILTER = []
 
 ############################################################################
+
 
 def _init_log_to_sysout(level=logging.INFO):
     """
@@ -116,7 +119,7 @@ def make_task_from_node(n, prop={}, prev_task=''):
     prop -- dictionnary of inherited properties
     prev_task -- name of previous task (used if ORDERED is set)
     """
-    __LOG__.debug('make_task_from_node ({0})'.format({'n':n.headline, 'prop':prop, 'prev_task':prev_task}))
+    __LOG__.debug('make_task_from_node ({0})'.format({'n': n.headline, 'prop': prop, 'prev_task': prev_task}))
     gantt_code = ''
 
     try:
@@ -125,11 +128,10 @@ def make_task_from_node(n, prop={}, prev_task=''):
             name = str(uuid.uuid4()).replace('-', '_')
     except KeyError:
         name = str(uuid.uuid4()).replace('-', '_')
-    
+
     if ' ' in name:
         __LOG__.critical('** Space in task_id: [{0}]'.format(name))
         sys.exit(1)
-
 
     # check if we should filter this task from display
     global LISTE_FILTER
@@ -143,7 +145,7 @@ def make_task_from_node(n, prop={}, prev_task=''):
         else:
             __LOG__.critical('FILTER_PROP:{0}'.format(prop['resources']))
             if prop['resources'] is not None:
-                for x in prop['resources'].replace('[','').replace(']','').split(','):
+                for x in prop['resources'].replace('[', '').replace(']', '').split(','):
                     if x in LISTE_FILTER:
                         __LOG__.critical('FILTER FOUND:{0}'.format(x))
                         break
@@ -152,8 +154,7 @@ def make_task_from_node(n, prop={}, prev_task=''):
 
             else:
                 display = False
-        
-    
+
     fullname = n.headline.strip().replace("'", '_')
     start = end = duration = None
     if n.scheduled != '':
@@ -180,27 +181,26 @@ def make_task_from_node(n, prop={}, prev_task=''):
             depends = n.properties['BLOCKER'].split()
         except KeyError:
             depends_of = None
-        else: # no exception raised
+        else:  # no exception raised
             depends_of = []
             for d in depends:
                 depends_of.append('task_{0}'.format(d))
 
-    if 'ordered'in prop and prop['ordered'] and prev_task is not None and prev_task != '':
+    if 'ordered' in prop and prop['ordered'] and prev_task is not None and prev_task != '':
         depends_of = ['task_{0}'.format(prev_task)]
 
     if depends_of is not None and len(depends_of) == 0:
         depends_of = None
-    
+
     try:
         percentdone = n.properties['PercentDone']
     except KeyError:
         percentdone = None
-    
+
     if n.todo == 'DONE':
         if percentdone is not None or percentdone != '100':
             __LOG__.warning('** Task [{0}] marked as done but PercentDone is set to {1}'.format(name, percentdone))
         percentdone = 100
-
 
     global LISTE_IGNORE_TAGS
 
@@ -220,7 +220,7 @@ def make_task_from_node(n, prop={}, prev_task=''):
         ress = "{0}".format(["{0}".format(x) for x in n.properties['allocate'].replace(",", " ").split()]).replace("'", "")
     else:
         try:
-            ress = "{0}".format(["{0}".format(x.strip()) for x in prop['resources'].replace('[','').replace(']','').split(',') if x.strip() not in LISTE_IGNORE_TAGS]).replace("'", "")
+            ress = "{0}".format(["{0}".format(x.strip()) for x in prop['resources'].replace('[', '').replace(']', '').split(',') if x.strip() not in LISTE_IGNORE_TAGS]).replace("'", "")
         except KeyError:
             ress = None
         except TypeError:
@@ -228,20 +228,17 @@ def make_task_from_node(n, prop={}, prev_task=''):
         except AttributeError:
             ress = None
 
-
     # get color from task properties
     if 'color' in n.properties:
         color = "'{0}'".format(n.properties['color'].strip())
 
     # inherits color if defined
-    elif 'color' in prop and prop['color'] is not None and n.todo in prop['color'] and  prop['color'][n.todo] is not None:
+    elif 'color' in prop and prop['color'] is not None and n.todo in prop['color'] and prop['color'][n.todo] is not None:
         color = "'{0}'".format(prop['color'][n.todo])
-        
+
     else:
         color = None
 
-
-    
     if n.todo != 'MILESTONE':
         # check stops
         ends = (start, end, duration)
@@ -250,24 +247,24 @@ def make_task_from_node(n, prop={}, prev_task=''):
             if e is None:
                 nonecount += 1
 
-        if nonecount !=1 and (duration is None or duration=='' or (duration != '' and depends_of is None)):
+        if nonecount != 1 and (duration is None or duration == '' or (duration != '' and depends_of is None)):
             __LOG__.critical('** Task "{0}" : no start, stop, duration or dependencies -> not included in gantt !'.format(fullname))
             return None
-        
+
         gantt_code += "task_{0} = gantt.Task(name='{1}', start={2}, stop={6}, duration={3}, resources={4}, depends_of={5}, percent_done={7}, fullname='{8}', color={9}, display={10}, state='{11}')\n".format(name, name, start, duration, ress, None, end, percentdone, fullname, color, display, n.todo)
     else:
         gantt_code += "task_{0} = gantt.Milestone(name='{1}', depends_of={2}, fullname='{3}', color={4}, display={5})\n".format(name, name, None, fullname, color, display)
 
     # store dependencies for later
     dependencies = str(depends_of).replace("'", "")
-    
+
     return (name, gantt_code, dependencies)
 
 
 ############################################################################
 
 @clize.clize(
-    alias = {
+    alias={
         'debug': ('d',),
         'csv': ('c',),
         'warning': ('w',),
@@ -280,20 +277,19 @@ def make_task_from_node(n, prop={}, prev_task=''):
         'end_date': ('e',),
         'today': ('t',),
         'filter': ('f',),
-        'scale': ('k',),
-        },
-    extra = (
-        clize.make_flag(
+        'scale': ('k',)},
+    extra=(
+        clize.make_flag
+        (
             source=__show_version__,
             names=('version', 'v'),
-            help="Show the version",
-            ),
-        )
-    )
+            help="Show the version"
+        ),
+    ))
 def __main__(org, csv='', gantt='', start_date='', end_date='', today='', debug=False, resource=False, svg='project', filter='', availibility='', warning=False, one_line_for_tasks=False, scale='d'):
     """
     org2gantt.py
-    
+
     org: org-mode filename
 
     gantt: output python-gantt filename (if not specified, code is directly executed)
@@ -317,7 +313,7 @@ def __main__(org, csv='', gantt='', start_date='', end_date='', today='', debug=
     scale: scale for the graph (d: days, w: weeks, m: months, q: quaterly)
 
     csv: filename for csv output
-    
+
     debug: debug
 
     warning: set warning level for creating gantt
@@ -349,18 +345,18 @@ import gantt
     if not os.path.isfile(org):
         __LOG__.error('** File do not exist : {0}'.format(org))
         sys.exit(1)
-    
+
     # load orgfile
     nodes = Orgnode.makelist(org)
 
-    __LOG__.debug('_analyse_nodes ({0})'.format({'nodes':nodes}))
+    __LOG__.debug('_analyse_nodes ({0})'.format({'nodes': nodes}))
 
     # Get all todo items
-    LISTE_TODOS = {'TODO':None, 'DONE':None, 'MILESTONE':None}
+    LISTE_TODOS = {'TODO': None, 'DONE': None, 'MILESTONE': None}
     with open(org) as f:
         for line in f.readlines():
             if line[:10] == '#+SEQ_TODO':
-                kwlist = re.findall('([A-Z]+)\(', line)
+                kwlist = re.findall(r'([A-Z]+)\(', line)
                 for kw in kwlist:
                     LISTE_TODOS[kw] = None
 
@@ -374,12 +370,11 @@ import gantt
     planning_end_date = None
     planning_today_date = _iso_date_to_datetime(str(datetime.date.today()))
     my_today = datetime.date.today()
-    bar_color = {'TODO':'#FFFF90'}
+    bar_color = {'TODO': '#FFFF90'}
 
     if one_line_for_tasks and not resource:
         __LOG__.critical('option one_line_for_tasks must be used in conjonction with resource graph generation')
         sys.exit(-1)
-        
 
     global LISTE_IGNORE_TAGS
     LISTE_IGNORE_TAGS = []
@@ -398,10 +393,10 @@ import gantt
                 bar_color[t] = n_configuration.properties['color_{0}'.format(t)].strip()
 
         if 'ignore_tags' in n_configuration.properties:
-             LISTE_IGNORE_TAGS = n_configuration.properties['ignore_tags'].split()
+            LISTE_IGNORE_TAGS = n_configuration.properties['ignore_tags'].split()
 
         if not one_line_for_tasks and ('one_line_for_tasks' in n_configuration.properties and n_configuration.properties['one_line_for_tasks'].strip() == 't'):
-             one_line_for_tasks = True
+            one_line_for_tasks = True
 
         if today != '':
             planning_today_date = _iso_date_to_datetime(today)
@@ -425,11 +420,11 @@ import gantt
                 qte = int(start_date[1:-1])
                 what = start_date[-1]
 
-                sign = -1*(sign=='-') + 1*(sign=='+')
+                sign = -1 * (sign == '-') + 1 * (sign == '+')
                 if what == 'd':
-                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte*sign)))
+                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte * sign)))
                 elif what == 'w':
-                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte*sign)))
+                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte * sign)))
                 else:
                     __LOG__.critical('Unknown start date format : "{0}". Valid format are yyyy-mm-dd or [-+]x[dw]'.format(start_date))
                     sys.exit(-1)
@@ -445,15 +440,14 @@ import gantt
                 qte = int(n_configuration.properties['start_date'][1:-1])
                 what = n_configuration.properties['start_date'][-1]
 
-                sign = -1*(sign=='-') + 1*(sign=='+')
+                sign = -1 * (sign == '-') + 1 * (sign == '+')
                 if what == 'd':
-                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte*sign)))
+                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte * sign)))
                 elif what == 'w':
-                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte*sign)))
+                    planning_start_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte * sign)))
                 else:
                     __LOG__.critical('Unknown start date format : "{0}". Valid format are yyyy-mm-dd or [-+]x[dw]'.format(start_date))
                     sys.exit(-1)
-
 
         if end_date != '':
             dates = re.findall('[1-9][0-9]{3}-[0-9]{2}-[0-9]{2}', end_date)
@@ -466,11 +460,11 @@ import gantt
                 qte = int(end_date[1:-1])
                 what = end_date[-1]
 
-                sign = -1*(sign=='-') + 1*(sign=='+')
+                sign = -1 * (sign == '-') + 1 * (sign == '+')
                 if what == 'd':
-                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte*sign)))
-                elif what == 'w':                                 
-                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte*sign)))
+                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte * sign)))
+                elif what == 'w':
+                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte * sign)))
                 else:
                     __LOG__.critical('Unknown end date format : "{0}". Valid format are yyyy-mm-dd or [-+]x[dw]'.format(end_date))
                     sys.exit(-1)
@@ -486,21 +480,18 @@ import gantt
                 qte = int(n_configuration.properties['end_date'][1:-1])
                 what = n_configuration.properties['end_date'][-1]
 
-                sign = -1*(sign=='-') + 1*(sign=='+')
+                sign = -1 * (sign == '-') + 1 * (sign == '+')
                 if what == 'd':
-                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte*sign)))
-                elif what == 'w':                                 
-                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte*sign)))
+                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(days=qte * sign)))
+                elif what == 'w':
+                    planning_end_date = _iso_date_to_datetime(str(my_today + datetime.timedelta(weeks=qte * sign)))
                 else:
                     __LOG__.critical('Unknown end date format : "{0}". Valid format are yyyy-mm-dd or [-+]x[dw]'.format(end_date))
                     sys.exit(-1)
 
-
-
     if eval(planning_end_date) <= eval(planning_start_date):
         __LOG__.critical('planning_end_date [{0}] is before planning_start_date [{1}]...'.format(planning_end_date, planning_start_date))
         sys.exit(-1)
-
 
     if scale != '':
         scale_ref = {
@@ -508,7 +499,7 @@ import gantt
             'w': 'DRAW_WITH_WEEKLY_SCALE',
             'm': 'DRAW_WITH_MONTHLY_SCALE',
             'q': 'DRAW_WITH_QUATERLY_SCALE',
-            }
+        }
         try:
             scale_name = scale_ref[scale]
         except KeyError:
@@ -518,11 +509,8 @@ import gantt
             __LOG__.info('drawing with scale : {0}'.format(scale_name))
     else:
         scale_name = 'DRAW_WITH_DAILY_SCALE'
-            
-
 
     __LOG__.debug('List of ignored tags : {0}'.format(LISTE_IGNORE_TAGS))
-
 
     # Find RESOURCES in heading
     n_resources = []
@@ -530,11 +518,11 @@ import gantt
     found = False
     plevel = 0
     for n in nodes:
-        if found == True and n.level > plevel:
+        if found and n.level > plevel:
             n_resources.append(n)
-        elif found == True and n.level <= plevel:
+        elif found and n.level <= plevel:
             break
-        if found == False and n.headline.strip() == "RESOURCES":
+        if not found and n.headline.strip() == "RESOURCES":
             found = True
             plevel = n.level
 
@@ -547,11 +535,11 @@ import gantt
     for nr, r in enumerate(n_resources):
         r = n_resources[nr]
 
-        rname = r.headline.strip().replace("'","_")
+        rname = r.headline.strip().replace("'", "_")
         try:
             rid = r.properties['resource_id'].strip()
         except KeyError:
-            rid = 'r_'+str(uuid.uuid4()).replace('-', '_')
+            rid = 'r_' + str(uuid.uuid4()).replace('-', '_')
 
         if rid in resources_id:
             __LOG__.critical('** Duplicate resource_id: [{0}]'.format(rid))
@@ -567,7 +555,7 @@ import gantt
 
         current_level = r.level
         if nr < len(n_resources) - 2:
-            next_level = n_resources[nr+1].level
+            next_level = n_resources[nr + 1].level
 
         # Group mode
         if current_level < next_level:
@@ -577,7 +565,7 @@ import gantt
         # Resource
         else:
             gantt_code += "{0} = gantt.Resource(name='{0}', fullname='{1}')\n".format(rid, rname)
-            
+
         # Vacations in body of node
         for line in r.body.split('\n'):
             if line.startswith('-'):
@@ -588,19 +576,17 @@ import gantt
                 elif len(dates) == 1:
                     start = dates[0]
                     gantt_code += "{0}.add_vacations(dfrom={1})\n".format(rid, _iso_date_to_datetime(start))
-                
+
             else:
                 if line != '' and not line.strip().startswith(':'):
                     __LOG__.warning("Unknown resource line : {0}".format(line))
 
-
-        if new_group_this_turn == False and current_group is not None:
+        if not new_group_this_turn and current_group is not None:
             gantt_code += "{0}.add_resource(resource={1})\n".format(current_group, rid)
 
             # end of group
             if current_level > next_level:
                 current_group = None
-
 
     # Find VACATIONS in heading
     n_vacations = None
@@ -625,10 +611,9 @@ import gantt
                 if line != '':
                     __LOG__.warning("Unknown vacation line : {0}".format(line))
 
-
     # Generate code for Projects
     gantt_code += "\n#### Projects \n"
-    # Mother of all 
+    # Mother of all
     gantt_code += "project = gantt.Project(color='{0}')\n".format(bar_color['TODO'])
 
     prj_found = False
@@ -642,12 +627,12 @@ import gantt
         n = nodes[nr]
 
         __LOG__.debug('Analysing {0}'.format(n.headline))
-        
+
         # it's a task / level 1
         if n.level == 1 \
-               and  not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
-               and 'no_gantt' not in n.tags \
-               and n.todo in LISTE_TODOS:
+                and not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
+                and 'no_gantt' not in n.tags \
+                and n.todo in LISTE_TODOS:
 
             __LOG__.debug(' task / level 1')
 
@@ -683,9 +668,9 @@ import gantt
         # Not a task, it's a project
         # it should have children
         elif n.level >= 1 \
-                 and  not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
-                 and 'no_gantt' not in n.tags \
-                 and not n.todo in LISTE_TODOS:
+                and not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
+                and 'no_gantt' not in n.tags \
+                and n.todo not in LISTE_TODOS:
 
             if no_gantt_level is not None and n.level > no_gantt_level:
                 __LOG__.debug('no_gantt_tag {0}/{1}'.format(n.level, no_gantt_level))
@@ -699,14 +684,13 @@ import gantt
                 prev_task = None
                 prop_inherits = []
 
-            if n.level > 1 and prj_found == False:
+            if n.level > 1 and not prj_found:
                 __LOG__.debug(' do not keep')
                 continue
 
             if len(prop_inherits) >= n.level:
                 __LOG__.debug(' go one level up')
                 prop_inherits = prop_inherits[:-1]
-
 
             __LOG__.debug(' new project heading')
 
@@ -716,7 +700,6 @@ import gantt
                 name = n.properties['task_id'].strip()
             except KeyError:
                 name = str(uuid.uuid4()).replace('-', '_')
-    
 
             __LOG__.debug('{0}'.format(prop_inherits))
 
@@ -724,7 +707,7 @@ import gantt
                 gantt_code += "project_{0} = gantt.Project(name='{1}', color='{2}')\n".format(name, n.headline.strip().replace("'", '_'), bar_color['TODO'])
             else:
                 gantt_code += "project_{0} = gantt.Project(name='{1}', color=None)\n".format(name, n.headline.strip().replace("'", '_'))
-                
+
             try:
                 gantt_code += "project_{0}.add_task(project_{1})\n".format(prop_inherits[-1]['project_id'], name)
             except KeyError:
@@ -746,7 +729,7 @@ import gantt
                     ordered = False
 
             color = copy.deepcopy(bar_color)
-            # Inherits color            
+            # Inherits color
             if 'color' in n.properties:
                 color['TODO'] = n.properties['color']
             else:
@@ -755,13 +738,11 @@ import gantt
                 else:
                     color['TODO'] = bar_color['TODO']
 
-
-
             # Inherits resources
             # Resources as tag
             if len(n.tags) > 0:
                 # For inherit all tags
-                #ress = "{0}".format(["{0}".format(x) for x in n.tags.keys() if x not in LISTE_IGNORE_TAGS]).replace("'", "")
+                # ress = "{0}".format(["{0}".format(x) for x in n.tags.keys() if x not in LISTE_IGNORE_TAGS]).replace("'", "")
                 ress = "{0}".format(["{0}".format(x) for x in n.tags.keys()]).replace("'", "")
                 # Resources as properties
             elif 'allocate' in n.properties:
@@ -774,18 +755,15 @@ import gantt
                 except IndexError:
                     ress = None
 
-
-            prop_inherits.append({'ordered':ordered, 'color':color, 'project_id':name, 'resources':ress})
+            prop_inherits.append({'ordered': ordered, 'color': color, 'project_id': name, 'resources': ress})
             prj_found = True
-
-
 
         # It's a task
         elif n.level >= 1 \
-                 and prj_found == True \
-                 and  not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
-                 and 'no_gantt' not in n.tags \
-                 and n.todo in LISTE_TODOS:
+                and prj_found \
+                and not n.headline.strip() in ('RESOURCES', 'VACATIONS', 'CONFIGURATION') \
+                and 'no_gantt' not in n.tags \
+                and n.todo in LISTE_TODOS:
 
             __LOG__.debug(' new task under project {0}'.format(n.headline))
 
@@ -801,10 +779,8 @@ import gantt
                 __LOG__.debug('remove no_gantt_tag {0}/{1}'.format(n.level, no_gantt_level))
                 no_gantt_level = None
 
-                
             if n.level > 1 and len(prop_inherits) < n.level - 1:
                 __LOG__.critical('pb in structure : task "{0}" do not belong to a project but a task - possible inheritance problem'.format(n.headline))
-                
 
             if len(prop_inherits) >= n.level:
                 __LOG__.debug(' go one level up')
@@ -826,7 +802,6 @@ import gantt
                 name, code, dependencies = nt
                 late_dependencies.append([name, dependencies])
 
-
             if name in tasks_name:
                 __LOG__.critical("Duplicate task id: {0}".format(name))
                 sys.exit(1)
@@ -836,7 +811,7 @@ import gantt
             prev_task = name
 
             gantt_code += code
-            #gantt_code += "project.add_task(task_{0})\n".format(name)
+            # gantt_code += "project.add_task(task_{0})\n".format(name)
 
             try:
                 gantt_code += "project_{0}.add_task(task_{1})\n".format(prop_inherits[-1]['project_id'], name)
@@ -848,36 +823,29 @@ import gantt
         else:
             prj_found = False
             prop_inherits = []
-
             __LOG__.debug(' nothing')
-            
 
     gantt_code += "\n#### Dependencies \n"
     # Late dependencies
     for name, dep in late_dependencies:
         gantt_code += "task_{0}.add_depends(depends_of={1})\n".format(name, dep)
 
-
     if availibility == '':
         # Full project
         gantt_code += "\n#### Outputs \n"
-
 
         gantt_code += "project.make_svg_for_tasks(filename='{3}.svg', today={0}, start={1}, end={2}, scale=gantt.{4})\n".format(planning_today_date, planning_start_date, planning_end_date, svg, scale_name)
         # Generate resource graph
         if resource:
             gantt_code += "project.make_svg_for_resources(filename='{4}_resources.svg', today={0}, start={1}, end={2}, one_line_for_tasks={3}, filter='{5}', scale=gantt.{6})\n".format(planning_today_date, planning_start_date, planning_end_date, one_line_for_tasks, svg, filter, scale_name)
-            
+
     else:
         gantt_code += "\n#### Check resource availibility \n"
         gantt_code += "print({0}.is_vacant(from_date={1}, to_date={2}))\n".format(availibility, planning_start_date, planning_end_date)
-        
-
 
     if csv != '':
         gantt_code += "\n#### CSV Outputs \n"
         gantt_code += "project.csv('{0}')\n".format(csv)
-
 
     # write Gantt code
     if gantt == '':
@@ -886,25 +854,12 @@ import gantt
     else:
         open(gantt, 'w').write(gantt_code)
 
-
-
-
     __LOG__.debug("All done. Exiting.")
-    
+
     return
 
 
-
-############################################################################
-
-
-
-# MAIN -------------------
 if __name__ == '__main__':
 
     clize.run(__main__)
     sys.exit(0)
-
-    
-#<EOF>######################################################################
-

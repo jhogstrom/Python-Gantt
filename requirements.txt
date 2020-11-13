@@ -14,3 +14,5 @@ pytz==2015.7              # via dateutils
 sigtools==1.0             # via clize
 six==1.10.0               # via clize, python-dateutil, sigtools
 svgwrite==1.1.6
+flake8
+pandoc

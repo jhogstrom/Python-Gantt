@@ -1,4 +1,3 @@
-syntax: glob
 *.pyc
 *~
 .~lock.*#
@@ -20,7 +19,5 @@ gantt.egg-info/*
 htmlcov/*
 .tox/*
 docs/*
-
-syntax: regexp
-(.*/)?\#[^/]*\#$
-(.*/)?\#[^/]*$
+act.bat
+deact.bat

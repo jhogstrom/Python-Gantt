@@ -2,8 +2,11 @@
 
 VERSION=$(shell $(PYTHON) setup.py --version)
 ARCHIVE=$(shell $(PYTHON) setup.py --fullname)
-PYTHON=python3.4
+PYTHON=python
 PANDOC=~/.cabal/bin/pandoc
+PANDOC=$(PYTHON) -m pandoc
+
+.PHONY: changelog
 
 install:
 	@$(PYTHON) setup.py install
@@ -29,7 +32,7 @@ readme:
 	@$(PANDOC) -f markdown -t rst README.md -o README.txt
 
 changelog:
-	@hg shortlog |~/.cabal/bin/pandoc -f org -t plain > CHANGELOG
+	@git log --oneline --since="2 months ago"> CHANGELOG
 
 
 test:
@@ -48,10 +51,10 @@ toxtest:
 	rm test.py
 
 conformity:
-	pyflakes org2gantt/org2gantt.py
-	pyflakes gantt/gantt.py
-	flake8 org2gantt/org2gantt.py
-	flake8 gantt/gantt.py
+	-pyflakes gantt/gantt.py
+	-flake8 gantt/gantt.py
+	-flake8 --ignore E501 org2gantt/org2gantt.py
+	-pyflakes org2gantt/org2gantt.py
 
 
 pipregister:
