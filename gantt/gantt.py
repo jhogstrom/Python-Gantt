@@ -42,6 +42,7 @@ import logging
 import sys
 import types
 import re
+from collections import defaultdict
 
 # https://bitbucket.org/mozman/svgwrite
 # http://svgwrite.readthedocs.org/en/latest/
@@ -104,7 +105,6 @@ def define_not_worked_days(list_of_days):
     """
     global NOT_WORKED_DAYS
     NOT_WORKED_DAYS = list_of_days
-    return
 
 
 def _not_worked_days():
@@ -143,12 +143,10 @@ def define_font_attributes(fill='black', stroke='black', stroke_width=0, font_fa
         'font_family': font_family,
         }
 
-    return
-
 
 def _font_attributes():
     """
-    Return dictionnary of font attributes
+    Return dictionary of font attributes
     Example :
     FONT_ATTR = {
       'fill': 'black',
@@ -191,8 +189,6 @@ def add_vacations(start_date, end_date=None):
 
     __LOG__.debug('** add_vacations {0}'.format({'start_date': start_date, 'end_date': end_date, 'vac': VACATIONS}))
 
-    return
-
 
 def init_log_to_sysout(level=logging.INFO):
     """
@@ -209,7 +205,6 @@ def init_log_to_sysout(level=logging.INFO):
     fh.setFormatter(formatter)
     logger.addHandler(fh)
     __LOG__ = logging.getLogger("Gantt")
-    return
 
 
 def _show_version(name, **kwargs):
@@ -269,7 +264,6 @@ class GroupOfResources(object):
         self.resources = []
 
         self.tasks = []
-        return
 
     def add_resource(self, resource):
         """
@@ -281,7 +275,6 @@ class GroupOfResources(object):
         if resource not in self.resources:
             self.resources.append(resource)
             resource.add_group(self)
-        return
 
     def add_vacations(self, dfrom, dto=None):
         """
@@ -294,10 +287,8 @@ class GroupOfResources(object):
         """
         __LOG__.debug(f'** Resource::add_vacations name: {self.name} -- dfrom: {dfrom} dto: {dto}')
         if dto is None:
-            self.vacations.append((dfrom, dfrom))
-        else:
-            self.vacations.append((dfrom, dto))
-        return
+            dto = dfrom
+        self.vacations.append((dfrom, dto))
 
     def nb_elements(self):
         """
@@ -344,11 +335,10 @@ class GroupOfResources(object):
         """
         if task not in self.tasks:
             self.tasks.append(task)
-        return
 
     def search_for_task_conflicts(self, all_tasks=False):
         """
-        Returns a dictionnary of all days (datetime.date) containing for each
+        Returns a dictionary of all days (datetime.date) containing for each
         overcharged day the list of task for this day.
 
         It examines all resources member and group tasks.
@@ -396,18 +386,13 @@ class GroupOfResources(object):
     def is_vacant(self, from_date, to_date):
         """
         Check if any resource from the group is unallocated between for a given timeframe.
-        Returns a list of available ressource name.
+        Returns a list of available resource name.
 
         Keyword arguments:
         from_date -- first day
         to_date --  last day
         """
-        availables = []
-        for r in self.resources:
-            if len(r.is_vacant(from_date, to_date)) > 0:
-                availables.append(r.name)
-
-        return availables
+        return [_ for _ in self.resources if len(_.is_vacant(from_date, to_date)) > 0]
 
 
 class Resource(object):
@@ -433,9 +418,8 @@ class Resource(object):
         self.member_of_groups = []
 
         self.tasks = []
-        return
 
-    def add_vacations(self, dfrom, dto=None):
+    def add_vacations(self, dfrom, dto=None) -> None:
         """
         Add vacations to a resource begining at [dfrom] to [dto] (included). If
         [dto] is not defined, vacation will be for [dfrom] day only
@@ -446,10 +430,8 @@ class Resource(object):
         """
         __LOG__.debug(f'** Resource::add_vacations({self.name}, {dfrom}, {dto})')
         if dto is None:
-            self.vacations.append((dfrom, dfrom))
-        else:
-            self.vacations.append((dfrom, dto))
-        return
+            dto = dfrom
+        self.vacations.append((dfrom, dto))
 
     def nb_elements(self):
         """
@@ -497,7 +479,6 @@ class Resource(object):
         """
         if groupofresources not in self.member_of_groups:
             self.member_of_groups.append(groupofresources)
-        return
 
     def add_task(self, task):
         """
@@ -508,25 +489,21 @@ class Resource(object):
         """
         if task not in self.tasks:
             self.tasks.append(task)
-        return
 
     def search_for_task_conflicts(self, all_tasks=False):
         """
-        Returns a dictionnary of all days (datetime.date) containing for each
+        Returns a dictionary of all days (datetime.date) containing for each
         overcharged day the list of task for this day.
 
         Keyword arguments:
         all_tasks -- if True return all tasks for all days, not just overcharged days
         """
-        affected_days = {}
+        affected_days = defaultdict(list)
         for t in self.tasks:
             cday = t.start_date()
             while cday <= t.end_date():
                 if cday.weekday() not in _not_worked_days():
-                    try:
-                        affected_days[cday].append(t.fullname)
-                    except KeyError:
-                        affected_days[cday] = [t.fullname]
+                    affected_days[cday].append(t.fullname)
 
                 cday += datetime.timedelta(days=1)
 
@@ -559,10 +536,10 @@ class Resource(object):
         while cday <= to_date:
             if cday.weekday() not in _not_worked_days():
                 if not self.is_available(cday):
-                    __LOG__.debug(f'** Ressource "{self.name}" is not available on day {cday} (vacation)')
+                    __LOG__.debug(f'** Ressource "{self.name}" not available on day {cday} (vacation)')
                     return []
                 if cday in non_vacant_days:
-                    __LOG__.debug(f'** Ressource "{self.name}" is not available on day {cday} (other task: {non_vacant_days[cday]})')
+                    __LOG__.debug(f'** Ressource "{self.name}" not available on day {cday} (other task: {non_vacant_days[cday]})')
                     return []
 
             cday += datetime.timedelta(days=1)
@@ -631,11 +608,7 @@ class Task(object):
         self.state = state
         self.url = url
 
-        ends = (self.start, self.stop, self.duration)
-        nonecount = 0
-        for e in ends:
-            if e is None:
-                nonecount += 1
+        nonecount = len([_ for _ in [self.start, self.stop, self.duration] if _ is None])
 
         # check limits (2 must be set on 4) or scheduling is defined by duration and dependencies
         if nonecount != 1 and (self.duration is None or depends_of is None):
@@ -664,8 +637,6 @@ class Task(object):
             for r in resources:
                 r.add_task(self)
 
-        return
-
     def add_depends(self, depends_of):
         """
         Adds dependency to a task
@@ -684,8 +655,6 @@ class Task(object):
                 self.depends_of = depends_of
             else:
                 self.depends_of.append(depends_of)
-
-        return
 
     def start_date(self):
         """
@@ -1254,7 +1223,6 @@ class Task(object):
         self.drawn_y_coord = None
         self._cache_start_date = None
         self._cache_end_date = None
-        return
 
     def is_in_project(self, task):
         """
@@ -1264,10 +1232,7 @@ class Task(object):
         task -- Task object
         """
         __LOG__.debug('** Task::is_in_project ({0})'.format({'name': self.name, 'task': task}))
-        if task is self:
-            return True
-
-        return False
+        return task is self
 
     def get_resources(self):
         """
@@ -1280,7 +1245,7 @@ class Task(object):
         Displays a warning for each conflict between tasks and vacation of
         resources affected to the task
 
-        And returns a dictionnary for resource vacation conflicts
+        And returns a dictionary for resource vacation conflicts
         """
         conflicts = []
         if self.get_resources() is None:
@@ -1366,8 +1331,6 @@ class Milestone(Task):
         self.drawn_y_coord = None
         self._cache_start_date = None
         self._cache_end_date = None
-
-        return
 
     def end_date(self):
         """
@@ -1591,7 +1554,7 @@ class Milestone(Task):
 
     def get_resources(self):
         """
-        Returns Resources used in the milestone
+        Returns Resources used in the milestone - always an empty list
         """
         return []
 
@@ -1600,7 +1563,7 @@ class Milestone(Task):
         Displays a warning for each conflict between milestones and vacation of
         resources affected to the milestone
 
-        And returns a dictionnary for resource vacation conflicts
+        And returns a dictionary for resource vacation conflicts
         """
         return []
 
@@ -1674,7 +1637,6 @@ class Project(object):
         """
         self.tasks.append(task)
         self.cache_nb_elements = None
-        return
 
     def add_legend(self, legend: Legend):
         self.legends.append(legend)
@@ -2072,7 +2034,7 @@ class Project(object):
         Draw resources affectation and output it to filename. If start or end are
         given, use them as reference, otherwise use project first and last day
 
-        And returns to a dictionnary of dictionnaries for vacation and task
+        And returns to a dictionary of dictionnaries for vacation and task
         conflicts for resources
 
         Keyword arguments:
@@ -2258,11 +2220,7 @@ class Project(object):
             __LOG__.warning('** Empty project : {0}'.format(self.name))
             return datetime.date(9999, 1, 1)
 
-        first = self.tasks[0].start_date()
-        for t in self.tasks:
-            if t.start_date() < first:
-                first = t.start_date()
-        return first
+        return min([_.start_date() for _ in self.tasks])
 
     def end_date(self):
         """
@@ -2272,11 +2230,7 @@ class Project(object):
             __LOG__.warning('** Empty project : {0}'.format(self.name))
             return datetime.date(1970, 1, 1)
 
-        last = self.tasks[0].end_date()
-        for t in self.tasks:
-            if t.end_date() > last:
-                last = t.end_date()
-        return last
+        return max([_.end_date() for _ in self.tasks])
 
     def svg(
             self,
@@ -2382,15 +2336,10 @@ class Project(object):
         """
         Returns the number of tasks included in the project or subproject
         """
-        if self.cache_nb_elements is not None:
-            return self.cache_nb_elements
+        if self.cache_nb_elements is None:
+            self.cache_nb_elements = sum([_.nb_elements() for _ in self.tasks])
+        return self.cache_nb_elements
 
-        nb = 0
-        for t in self.tasks:
-            nb += t.nb_elements()
-
-        self.cache_nb_elements = nb
-        return nb
 
     def _reset_coord(self):
         """
@@ -2414,11 +2363,7 @@ class Project(object):
         """
         Returns Resources used in the project
         """
-        rlist = []
-        for t in self.tasks:
-            r = t.get_resources()
-            if r is not None:
-                rlist.append(r)
+        rlist = [_.get_resources() for _ in self.tasks() if _.get_resources() is not None]
 
         flist = []
         for r in _flatten(rlist):

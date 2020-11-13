@@ -42,8 +42,8 @@ def test_add_vacations_2():
 def test_Resources():
     rANO = gantt.Resource('ANO')
     rANO.add_vacations(
-        dfrom=datetime.date(2015, 2, 2), 
-        dto=datetime.date(2015, 2, 4) 
+        dfrom=datetime.date(2015, 2, 2),
+        dto=datetime.date(2015, 2, 4)
         )
     # test global vacations
     assert_equals(rANO.is_available(datetime.date(2015, 1, 1)), False)
@@ -57,13 +57,13 @@ def test_Resources():
     # Second resource
     rJLS = gantt.Resource('JLS')
     return
-    
+
 
 def test_Tasks():
     tSADU = gantt.Task(name='tache SADU', start=datetime.date(2014, 12, 25), duration=4)
     assert_equals((tSADU.start_date(), tSADU.end_date()), (datetime.date(2014, 12, 26), datetime.date(2014, 12, 31)))
     assert_equals(tSADU.nb_elements(), 1)
- 
+
     tSAST = gantt.Task(name='tache SAST', start=datetime.date(2014, 12, 25), stop=datetime.date(2014, 12, 31))
     assert_equals((tSAST.start_date(), tSAST.end_date()), (datetime.date(2014, 12, 26), datetime.date(2014, 12, 31)))
 
@@ -160,4 +160,3 @@ def test_Tasks():
     assert_equals(p1.get_resources(), [])
     assert_equals(len(p1.get_tasks()), 17)
     return
-    
